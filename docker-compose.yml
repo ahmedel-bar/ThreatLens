@@ -1,0 +1,110 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: threatlens-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-threatlens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-threatlens_secure_pwd}
+      POSTGRES_DB: ${POSTGRES_DB:-threatlens}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-threatlens}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: threatlens-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - PROVIDER_MODE=${PROVIDER_MODE:-live}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-threatlens}:${POSTGRES_PASSWORD:-threatlens_secure_pwd}@postgres:5432/${POSTGRES_DB:-threatlens}
+      - MAX_PIVOT_DEPTH=${MAX_PIVOT_DEPTH:-2}
+      - MAX_PIVOT_NODES=${MAX_PIVOT_NODES:-25}
+      - MAX_PROVIDER_REQUESTS=${MAX_PROVIDER_REQUESTS:-40}
+      - CACHE_TTL=${CACHE_TTL:-3600}
+      - VT_API_KEY=${VT_API_KEY}
+      - OTX_API_KEY=${OTX_API_KEY}
+      - MALWAREBAZAAR_API_KEY=${MALWAREBAZAAR_API_KEY}
+      - HYBRID_ANALYSIS_API_KEY=${HYBRID_ANALYSIS_API_KEY}
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY}
+      - THREATFOX_API_KEY=${THREATFOX_API_KEY}
+      - URLHAUS_API_KEY=${URLHAUS_API_KEY}
+      - URLSCAN_API_KEY=${URLSCAN_API_KEY}
+      - CENSYS_API_KEY=${CENSYS_API_KEY:-${CENSYS_API_SECRET:-}}
+      - CENSYS_API_SECRET=${CENSYS_API_SECRET:-${CENSYS_API_KEY:-}}
+      - CENSYS_API_ID=${CENSYS_API_ID:-}
+      - GREYNOISE_API_KEY=${GREYNOISE_API_KEY}
+      - SHODAN_API_KEY=${SHODAN_API_KEY}
+      - PULSEDIVE_API_KEY=${PULSEDIVE_API_KEY}
+      - CRIMINALIP_API_KEY=${CRIMINALIP_API_KEY:-${CRIMINAL_IP_API_KEY:-${CRIMINAL_IP_KEY:-${CIP_API_KEY:-}}}}
+      - PASSIVEDNS_API_KEY=${PASSIVEDNS_API_KEY:-${MNEMONIC_API_KEY:-}}
+      - MNEMONIC_API_KEY=${MNEMONIC_API_KEY:-${PASSIVEDNS_API_KEY:-}}
+      - WEBCHECK_URL=${WEBCHECK_URL:-http://web-check:3000}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  web-check:
+    build:
+      context: ./web-check
+      dockerfile: Dockerfile
+    image: lissy93/web-check:latest
+    container_name: threatlens-webcheck
+    restart: unless-stopped
+    environment:
+      - DISABLE_GUI=true
+      - API_ENABLE_RATE_LIMIT=false
+      - API_CORS_ORIGIN=http://backend:8000,http://localhost:8000
+      - PUBLIC_API_TIMEOUT_LIMIT=40000
+      - GOOGLE_CLOUD_API_KEY=${GOOGLE_CLOUD_API_KEY:-}
+      - SHODAN_API_KEY=${SHODAN_API_KEY:-}
+      - CERTSPOTTER_TOKEN=${CERTSPOTTER_TOKEN:-}
+      - CLOUDMERSIVE_API_KEY=${CLOUDMERSIVE_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - TRANCO_USERNAME=${TRANCO_USERNAME:-}
+      - TRANCO_API_KEY=${TRANCO_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: threatlens-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "3000:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
