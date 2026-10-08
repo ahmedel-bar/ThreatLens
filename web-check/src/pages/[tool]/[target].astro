@@ -1,0 +1,24 @@
+---
+import ResultsLayout from '@layouts/Results.astro';
+import { categories, isCategory, toolName } from '@/data/categories';
+import { checks, isCheck } from '@/data/checks';
+
+export const prerender = false;
+
+const { tool = '', target } = Astro.params;
+
+if (!isCategory(tool) && !isCheck(tool)) return new Response(null, { status: 404 });
+
+// Uncategorised checks run the full report instead
+if (isCheck(tool) && !checks[tool].categories.length) return Astro.redirect(`/check/${target}`);
+
+const name = isCategory(tool) ? toolName(tool) : checks[tool].title;
+const description = isCategory(tool) ? categories[tool].description : checks[tool].summary;
+---
+
+<ResultsLayout
+  title={`${target} | ${name} | Web Check`}
+  description={description}
+  target={target}
+  tool={{ name, href: `/${tool}` }}
+/>

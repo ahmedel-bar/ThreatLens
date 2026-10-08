@@ -1,0 +1,112 @@
+---
+import PageLayout from '@layouts/Page.astro';
+import Footer from '@components/scafold/Footer.astro';
+import HomeBackground from '@components/homepage/HomeBackground';
+import ScanForm from '@components/form/ScanForm.astro';
+import SponsorCard from '@components/molecules/SponsorCard.astro';
+import { normalizeAddress } from '../../client/utils/address-type-checker';
+import { isCategory } from '@/data/categories';
+import { checks, checkIds, isCheck } from '@/data/checks';
+
+export const prerender = false;
+
+const { searchParams } = new URL(Astro.request.url);
+
+// Forward ?url= links, and their optional ?tool=, to the matching results page
+const searchUrl = normalizeAddress(searchParams.get('url') || '');
+const searchTool = searchParams.get('tool') || '';
+const toolPath = isCategory(searchTool) || isCheck(searchTool) ? searchTool : 'check';
+const redirectPath = searchUrl && `/${toolPath}/${searchUrl}`;
+
+if (redirectPath) return Astro.redirect(redirectPath);
+---
+
+<PageLayout>
+  <Fragment slot="nav"></Fragment>
+  <div slot="background" class="background">
+    <HomeBackground client:only="react" opacity={0.25} />
+  </div>
+  <div class="home">
+    <h1><img src="/favicon.svg" alt="" width="48" height="48" />Web <em>Check</em></h1>
+    <ScanForm label="Enter a URL" showCategories />
+    <div>
+      <h2>Checks</h2>
+      <ul>
+        {
+          checkIds.map((id) => (
+            <li>
+              <a href={`/${id}`}>{checks[id].title}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+    <SponsorCard />
+  </div>
+  <Footer slot="footer" miniView />
+</PageLayout>
+
+<style lang="scss">
+  .background {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 100vh;
+    overflow: hidden;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .home {
+    display: flex;
+    flex-direction: column;
+    gap: 4rem;
+
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0;
+      font-size: clamp(2.25rem, 6vw, 3.5rem);
+      color: var(--primary);
+
+      img {
+        width: 1em;
+      }
+
+      em {
+        color: var(--text-color);
+      }
+    }
+
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    ul {
+      columns: 11rem;
+      column-gap: 2rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      line-height: 1.8;
+
+      li {
+        break-inside: avoid;
+      }
+
+      a {
+        color: var(--text-color-secondary);
+        transition: color 0.25s ease;
+
+        &:hover,
+        &:focus-visible {
+          color: var(--primary);
+        }
+      }
+    }
+  }
+</style>

@@ -1,0 +1,9 @@
+---
+import ResultsLayout from '@layouts/Results.astro';
+
+export const prerender = false;
+
+const { target } = Astro.params;
+---
+
+<ResultsLayout title={`${target} | Web Check`} target={target} />
